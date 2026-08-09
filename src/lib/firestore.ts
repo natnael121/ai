@@ -6,7 +6,15 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../firebase";
-import type { ProcessingStatus, ScreenshotDoc } from "../types/research";
+import type {
+  AnnotationDoc,
+  ProcessingStatus,
+  ReviewStatus,
+  ScreenshotDoc,
+  Severity,
+  TargetType,
+  Theme,
+} from "../types/research";
 
 /**
  * Creates the images/{imageId} document right after an ImageBB upload
@@ -73,4 +81,43 @@ export async function createOcrResultDoc(input: {
     provider: "tesseract.js",
     createdAt: serverTimestamp(),
   });
+}
+
+/**
+ * Upserts a researcher's review of one comment, keyed by
+ * `{commentId}_{researcherId}` so re-saving the same researcher's review
+ * updates their one annotation rather than creating duplicates. Never
+ * touches the AI's own `classifications/{commentId}` doc — annotations
+ * are a separate, independent record (see README "AI classification is
+ * not ground truth").
+ */
+export async function saveAnnotation(input: {
+  commentId: string;
+  imageId: string;
+  researcherId: string;
+  reviewStatus: ReviewStatus;
+  theme: Theme | null;
+  severity: Severity;
+  targetType: TargetType;
+  notes?: string;
+}): Promise<void> {
+  const annotationId = `${input.commentId}_${input.researcherId}`;
+  const payload: Omit<AnnotationDoc, "createdAt" | "notes"> & {
+    createdAt: unknown;
+    notes?: string;
+  } = {
+    annotationId,
+    commentId: input.commentId,
+    imageId: input.imageId,
+    researcherId: input.researcherId,
+    reviewStatus: input.reviewStatus,
+    theme: input.theme,
+    severity: input.severity,
+    targetType: input.targetType,
+    createdAt: serverTimestamp(),
+  };
+  if (input.notes !== undefined) {
+    payload.notes = input.notes;
+  }
+  await setDoc(doc(db, "annotations", annotationId), payload);
 }

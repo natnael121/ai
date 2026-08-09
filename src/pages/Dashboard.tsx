@@ -15,7 +15,12 @@ import {
 } from "recharts";
 import { loadDataset, ALL_THEMES, THEME_LABELS, NO_THEME_LABEL, type DatasetRow } from "../lib/dataset";
 import { exportToExcel, exportToCsv, exportToJson } from "../lib/exportDataset";
-import type { Severity, Theme } from "../types/research";
+import { saveAnnotation } from "../lib/firestore";
+import { auth } from "../firebase";
+import type { ReviewStatus, Severity, TargetType, Theme } from "../types/research";
+
+const TARGET_TYPES: TargetType[] = ["individual", "group", "women_general", "unclear"];
+const REVIEW_STATUSES: ReviewStatus[] = ["pending", "accepted", "modified", "rejected"];
 
 const SEVERITY_ORDER: Severity[] = ["none", "low", "moderate", "high", "critical"];
 const SEVERITY_COLOR: Record<Severity, string> = {
@@ -176,7 +181,16 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {showRawTable && <RawTable rows={filtered} />}
+      {showRawTable && (
+        <RawTable
+          rows={filtered}
+          onAnnotationSaved={(commentId, patch) =>
+            setRows((prev) =>
+              prev ? prev.map((r) => (r.commentId === commentId ? { ...r, ...patch } : r)) : prev
+            )
+          }
+        />
+      )}
 
       {/* Signature: signal vs. silence composition bar */}
       <div className="card">
@@ -319,17 +333,90 @@ export default function DashboardPage() {
   );
 }
 
-function RawTable({ rows }: { rows: DatasetRow[] }) {
+interface EditState {
+  theme: Theme | "";
+  severity: Severity;
+  targetType: TargetType;
+  reviewStatus: ReviewStatus;
+  notes: string;
+}
+
+function RawTable({
+  rows,
+  onAnnotationSaved,
+}: {
+  rows: DatasetRow[];
+  onAnnotationSaved: (commentId: string, patch: Partial<DatasetRow>) => void;
+}) {
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editState, setEditState] = useState<EditState | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  function startEdit(row: DatasetRow) {
+    setEditingCommentId(row.commentId);
+    setSaveError(null);
+    setEditState({
+      theme: row.humanTheme ?? row.theme ?? "",
+      severity: (row.severity as Severity) || "none",
+      targetType: (row.targetType as TargetType) || "unclear",
+      reviewStatus:
+        (row.humanReviewStatus as ReviewStatus) === "pending" ? "accepted" : (row.humanReviewStatus as ReviewStatus),
+      notes: row.researcherNotes,
+    });
+  }
+
+  function cancelEdit() {
+    setEditingCommentId(null);
+    setEditState(null);
+    setSaveError(null);
+  }
+
+  async function save(row: DatasetRow) {
+    const researcherId = auth.currentUser?.uid;
+    if (!editState || !researcherId) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await saveAnnotation({
+        commentId: row.commentId,
+        imageId: row.imageId,
+        researcherId,
+        reviewStatus: editState.reviewStatus,
+        theme: editState.theme || null,
+        severity: editState.severity,
+        targetType: editState.targetType,
+        notes: editState.notes || undefined,
+      });
+      onAnnotationSaved(row.commentId, {
+        humanReviewStatus: editState.reviewStatus,
+        humanTheme: editState.theme || null,
+        researcherNotes: editState.notes,
+      });
+      setEditingCommentId(null);
+      setEditState(null);
+    } catch (err) {
+      setSaveError((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="card">
       <div className="stat-label" style={{ marginBottom: 12 }}>
-        Raw data ({rows.length.toLocaleString()} row{rows.length === 1 ? "" : "s"})
+        Raw data ({rows.length.toLocaleString()} row{rows.length === 1 ? "" : "s"}) — edits save as your
+        independent review, the AI's own coding is never overwritten
       </div>
+      {saveError && (
+        <p className="mono" style={{ fontSize: 12, color: "var(--sev-critical)" }}>{saveError}</p>
+      )}
       <div style={{ overflow: "auto", maxHeight: 480 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, whiteSpace: "nowrap" }}>
           <thead>
             <tr style={{ textAlign: "left", borderBottom: "1px solid var(--line)" }}>
               {[
+                "Screenshot",
                 "Image ID",
                 "Comment ID",
                 "Platform",
@@ -347,6 +434,7 @@ function RawTable({ rows }: { rows: DatasetRow[] }) {
                 "Notes",
                 "Likes",
                 "Replies",
+                "",
               ].map((h) => (
                 <th key={h} style={{ padding: "6px 10px", position: "sticky", top: 0, background: "var(--surface)" }}>
                   {h}
@@ -355,27 +443,123 @@ function RawTable({ rows }: { rows: DatasetRow[] }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={r.commentId} style={{ borderBottom: "1px solid var(--line)" }}>
-                <td className="mono" style={{ padding: "6px 10px" }}>{r.imageId}</td>
-                <td className="mono" style={{ padding: "6px 10px" }}>{r.commentId}</td>
-                <td style={{ padding: "6px 10px" }}>{r.platform}</td>
-                <td style={{ padding: "6px 10px" }}>{r.date}</td>
-                <td style={{ padding: "6px 10px", whiteSpace: "normal", maxWidth: 220 }}>{r.rawAmharic}</td>
-                <td style={{ padding: "6px 10px", whiteSpace: "normal", maxWidth: 220 }}>{r.correctedAmharic}</td>
-                <td style={{ padding: "6px 10px", whiteSpace: "normal", maxWidth: 260 }}>{r.englishTranslation}</td>
-                <td style={{ padding: "6px 10px" }}>{r.violencePresent ? "Yes" : "No"}</td>
-                <td style={{ padding: "6px 10px" }}>{r.theme ? THEME_LABELS[r.theme] : NO_THEME_LABEL}</td>
-                <td style={{ padding: "6px 10px" }}>{r.severity}</td>
-                <td style={{ padding: "6px 10px" }}>{r.targetType}</td>
-                <td className="mono" style={{ padding: "6px 10px" }}>{r.aiConfidence.toFixed(2)}</td>
-                <td style={{ padding: "6px 10px" }}>{r.humanReviewStatus}</td>
-                <td style={{ padding: "6px 10px" }}>{r.humanTheme ? THEME_LABELS[r.humanTheme] : NO_THEME_LABEL}</td>
-                <td style={{ padding: "6px 10px", whiteSpace: "normal", maxWidth: 200 }}>{r.researcherNotes}</td>
-                <td className="mono" style={{ padding: "6px 10px" }}>{r.likes ?? ""}</td>
-                <td className="mono" style={{ padding: "6px 10px" }}>{r.replies ?? ""}</td>
-              </tr>
-            ))}
+            {rows.map((r) => {
+              const isEditing = editingCommentId === r.commentId;
+              return (
+                <tr key={r.commentId} style={{ borderBottom: "1px solid var(--line)" }}>
+                  <td style={{ padding: "6px 10px" }}>
+                    {r.imageUrl ? (
+                      <a href={r.imageUrl} target="_blank" rel="noreferrer">
+                        View
+                      </a>
+                    ) : (
+                      ""
+                    )}
+                  </td>
+                  <td className="mono" style={{ padding: "6px 10px" }}>{r.imageId}</td>
+                  <td className="mono" style={{ padding: "6px 10px" }}>{r.commentId}</td>
+                  <td style={{ padding: "6px 10px" }}>{r.platform}</td>
+                  <td style={{ padding: "6px 10px" }}>{r.date}</td>
+                  <td style={{ padding: "6px 10px", whiteSpace: "normal", maxWidth: 220 }}>{r.rawAmharic}</td>
+                  <td style={{ padding: "6px 10px", whiteSpace: "normal", maxWidth: 220 }}>{r.correctedAmharic}</td>
+                  <td style={{ padding: "6px 10px", whiteSpace: "normal", maxWidth: 260 }}>{r.englishTranslation}</td>
+                  <td style={{ padding: "6px 10px" }}>{r.violencePresent ? "Yes" : "No"}</td>
+                  <td style={{ padding: "6px 10px" }}>
+                    {isEditing && editState ? (
+                      <select
+                        className="select"
+                        value={editState.theme}
+                        onChange={(e) => setEditState({ ...editState, theme: e.target.value as Theme | "" })}
+                      >
+                        <option value="">{NO_THEME_LABEL}</option>
+                        {ALL_THEMES.map((t) => (
+                          <option key={t} value={t}>{THEME_LABELS[t]}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      r.theme ? THEME_LABELS[r.theme] : NO_THEME_LABEL
+                    )}
+                  </td>
+                  <td style={{ padding: "6px 10px" }}>
+                    {isEditing && editState ? (
+                      <select
+                        className="select"
+                        value={editState.severity}
+                        onChange={(e) => setEditState({ ...editState, severity: e.target.value as Severity })}
+                      >
+                        {SEVERITY_ORDER.map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      r.severity
+                    )}
+                  </td>
+                  <td style={{ padding: "6px 10px" }}>
+                    {isEditing && editState ? (
+                      <select
+                        className="select"
+                        value={editState.targetType}
+                        onChange={(e) => setEditState({ ...editState, targetType: e.target.value as TargetType })}
+                      >
+                        {TARGET_TYPES.map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      r.targetType
+                    )}
+                  </td>
+                  <td className="mono" style={{ padding: "6px 10px" }}>{r.aiConfidence.toFixed(2)}</td>
+                  <td style={{ padding: "6px 10px" }}>
+                    {isEditing && editState ? (
+                      <select
+                        className="select"
+                        value={editState.reviewStatus}
+                        onChange={(e) => setEditState({ ...editState, reviewStatus: e.target.value as ReviewStatus })}
+                      >
+                        {REVIEW_STATUSES.map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      r.humanReviewStatus
+                    )}
+                  </td>
+                  <td style={{ padding: "6px 10px" }}>{r.humanTheme ? THEME_LABELS[r.humanTheme] : NO_THEME_LABEL}</td>
+                  <td style={{ padding: "6px 10px", whiteSpace: "normal", maxWidth: 200 }}>
+                    {isEditing && editState ? (
+                      <input
+                        className="select"
+                        style={{ width: "100%" }}
+                        value={editState.notes}
+                        onChange={(e) => setEditState({ ...editState, notes: e.target.value })}
+                      />
+                    ) : (
+                      r.researcherNotes
+                    )}
+                  </td>
+                  <td className="mono" style={{ padding: "6px 10px" }}>{r.likes ?? ""}</td>
+                  <td className="mono" style={{ padding: "6px 10px" }}>{r.replies ?? ""}</td>
+                  <td style={{ padding: "6px 10px" }}>
+                    {isEditing ? (
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button className="btn" disabled={saving} onClick={() => save(r)}>
+                          {saving ? "Saving…" : "Save"}
+                        </button>
+                        <button className="btn btn-outline" disabled={saving} onClick={cancelEdit}>
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button className="btn btn-outline" onClick={() => startEdit(r)}>
+                        Edit
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

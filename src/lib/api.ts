@@ -1,6 +1,6 @@
 /**
  * Triggers the serverless /api/process function for a single image.
- * The function itself is synchronous request/response (OCR + Grok for
+ * The function itself is synchronous request/response (OCR + Groq for
  * ONE screenshot), kept intentionally small so it finishes well inside
  * Vercel's function time limit. Batch fan-out/concurrency is handled
  * HERE on the client, not inside a single long-running function.
@@ -19,7 +19,7 @@ export async function processImage(imageId: string): Promise<void> {
 
 /**
  * Runs processImage over many imageIds with a small concurrency cap so
- * we don't blow past Grok/OCR rate limits or Vercel's concurrent
+ * we don't blow past Groq/OCR rate limits or Vercel's concurrent
  * invocation limits on the free tier. Reports progress via onProgress.
  */
 export async function processBatch(

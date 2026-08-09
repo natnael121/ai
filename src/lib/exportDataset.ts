@@ -6,6 +6,7 @@ function toExportRow(row: DatasetRow) {
   return {
     "Image ID": row.imageId,
     "Comment ID": row.commentId,
+    "Image URL": row.imageUrl,
     Platform: row.platform,
     Date: row.date,
     "Raw Amharic": row.rawAmharic,

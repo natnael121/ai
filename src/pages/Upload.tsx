@@ -44,7 +44,7 @@ export default function UploadPage() {
   }
 
   // Screenshots are processed one at a time, each through all four
-  // stages, so Tesseract.js (single shared worker) and the Grok API
+  // stages, so Tesseract.js (single shared worker) and the Groq API
   // aren't hit with 100 parallel requests at once.
   async function startProcessing() {
     setRunning(true);
@@ -72,7 +72,7 @@ export default function UploadPage() {
         updateRow(i, { status: "ocr done", detail: undefined });
 
         updateRow(i, { status: "classifying" });
-        await processImage(imageId); // OCR text -> Grok: split, correct, translate, classify
+        await processImage(imageId); // OCR text -> Groq: split, correct, translate, classify
         updateRow(i, { status: "done" });
       } catch (err) {
         updateRow(i, { status: "error", detail: (err as Error).message });
@@ -86,9 +86,10 @@ export default function UploadPage() {
     <div style={{ display: "grid", gap: 20 }}>
       <div className="card">
         <p style={{ marginTop: 0 }}>
-          Upload social-media screenshots. Each one uploads to ImageBB, then runs through
-          Amharic OCR (Tesseract.js, in your browser — free, no API key) and Grok
-          classification.
+          Upload screenshots of social-media posts and comments for analysis. Each
+          screenshot is uploaded to ImageBB, processed with Amharic optical character
+          recognition (Tesseract.js, running locally in your browser at no cost), and
+          then classified using Groq.
         </p>
         <input
           type="file"
@@ -97,9 +98,16 @@ export default function UploadPage() {
           disabled={running}
           onChange={(e) => onFilesSelected(e.target.files)}
         />
-        <div style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 16, display: "flex", gap: 8 }}>
           <button className="btn" onClick={startProcessing} disabled={running || rows.every((r) => r.status !== "queued")}>
             {running ? "Processing…" : `Process ${rows.filter((r) => r.status === "queued").length} screenshot(s)`}
+          </button>
+          <button
+            className="btn btn-outline"
+            onClick={() => setRows([])}
+            disabled={running || rows.length === 0}
+          >
+            Reset
           </button>
         </div>
       </div>

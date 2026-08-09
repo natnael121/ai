@@ -11,6 +11,7 @@ import type {
 export interface DatasetRow {
   imageId: string;
   commentId: string;
+  imageUrl: string;
   platform: string;
   date: string;
   rawAmharic: string;
@@ -92,6 +93,7 @@ export async function loadDataset(): Promise<DatasetRow[]> {
     rows.push({
       imageId: comment.imageId,
       commentId: comment.commentId,
+      imageUrl: image?.imageUrl ?? "",
       platform: image?.platform ?? "unknown",
       date: comment.commentDate ?? "",
       rawAmharic: comment.rawAmharic,
