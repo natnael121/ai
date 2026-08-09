@@ -99,12 +99,16 @@ export async function saveAnnotation(input: {
   theme: Theme | null;
   severity: Severity;
   targetType: TargetType;
+  correctedAmharic?: string;
+  englishTranslation?: string;
   notes?: string;
 }): Promise<void> {
   const annotationId = `${input.commentId}_${input.researcherId}`;
-  const payload: Omit<AnnotationDoc, "createdAt" | "notes"> & {
+  const payload: Omit<AnnotationDoc, "createdAt" | "notes" | "correctedAmharic" | "englishTranslation"> & {
     createdAt: unknown;
     notes?: string;
+    correctedAmharic?: string;
+    englishTranslation?: string;
   } = {
     annotationId,
     commentId: input.commentId,
@@ -118,6 +122,12 @@ export async function saveAnnotation(input: {
   };
   if (input.notes !== undefined) {
     payload.notes = input.notes;
+  }
+  if (input.correctedAmharic !== undefined) {
+    payload.correctedAmharic = input.correctedAmharic;
+  }
+  if (input.englishTranslation !== undefined) {
+    payload.englishTranslation = input.englishTranslation;
   }
   await setDoc(doc(db, "annotations", annotationId), payload);
 }

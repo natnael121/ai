@@ -172,6 +172,23 @@ export default function DashboardPage() {
           options={["all", "pending", "accepted", "modified", "rejected"]}
         />
         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          <button
+            className="btn btn-outline"
+            onClick={() => {
+              setPlatformFilter("all");
+              setSeverityFilter("all");
+              setThemeFilter("all");
+              setReviewFilter("all");
+            }}
+            disabled={
+              platformFilter === "all" &&
+              severityFilter === "all" &&
+              themeFilter === "all" &&
+              reviewFilter === "all"
+            }
+          >
+            Reset filters
+          </button>
           <button className="btn btn-outline" onClick={() => setShowRawTable((v) => !v)}>
             {showRawTable ? "Hide raw table" : "View raw table"}
           </button>
@@ -338,6 +355,8 @@ interface EditState {
   severity: Severity;
   targetType: TargetType;
   reviewStatus: ReviewStatus;
+  correctedAmharic: string;
+  englishTranslation: string;
   notes: string;
 }
 
@@ -362,6 +381,8 @@ function RawTable({
       targetType: (row.targetType as TargetType) || "unclear",
       reviewStatus:
         (row.humanReviewStatus as ReviewStatus) === "pending" ? "accepted" : (row.humanReviewStatus as ReviewStatus),
+      correctedAmharic: row.correctedAmharic,
+      englishTranslation: row.englishTranslation,
       notes: row.researcherNotes,
     });
   }
@@ -386,11 +407,15 @@ function RawTable({
         theme: editState.theme || null,
         severity: editState.severity,
         targetType: editState.targetType,
+        correctedAmharic: editState.correctedAmharic,
+        englishTranslation: editState.englishTranslation,
         notes: editState.notes || undefined,
       });
       onAnnotationSaved(row.commentId, {
         humanReviewStatus: editState.reviewStatus,
         humanTheme: editState.theme || null,
+        correctedAmharic: editState.correctedAmharic,
+        englishTranslation: editState.englishTranslation,
         researcherNotes: editState.notes,
       });
       setEditingCommentId(null);
@@ -461,8 +486,32 @@ function RawTable({
                   <td style={{ padding: "6px 10px" }}>{r.platform}</td>
                   <td style={{ padding: "6px 10px" }}>{r.date}</td>
                   <td style={{ padding: "6px 10px", whiteSpace: "normal", maxWidth: 220 }}>{r.rawAmharic}</td>
-                  <td style={{ padding: "6px 10px", whiteSpace: "normal", maxWidth: 220 }}>{r.correctedAmharic}</td>
-                  <td style={{ padding: "6px 10px", whiteSpace: "normal", maxWidth: 260 }}>{r.englishTranslation}</td>
+                  <td style={{ padding: "6px 10px", whiteSpace: "normal", maxWidth: 220 }}>
+                    {isEditing && editState ? (
+                      <textarea
+                        className="select"
+                        style={{ width: "100%", minWidth: 200 }}
+                        rows={2}
+                        value={editState.correctedAmharic}
+                        onChange={(e) => setEditState({ ...editState, correctedAmharic: e.target.value })}
+                      />
+                    ) : (
+                      r.correctedAmharic
+                    )}
+                  </td>
+                  <td style={{ padding: "6px 10px", whiteSpace: "normal", maxWidth: 260 }}>
+                    {isEditing && editState ? (
+                      <textarea
+                        className="select"
+                        style={{ width: "100%", minWidth: 220 }}
+                        rows={2}
+                        value={editState.englishTranslation}
+                        onChange={(e) => setEditState({ ...editState, englishTranslation: e.target.value })}
+                      />
+                    ) : (
+                      r.englishTranslation
+                    )}
+                  </td>
                   <td style={{ padding: "6px 10px" }}>{r.violencePresent ? "Yes" : "No"}</td>
                   <td style={{ padding: "6px 10px" }}>
                     {isEditing && editState ? (

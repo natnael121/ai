@@ -104,6 +104,11 @@ export interface AnnotationDoc {
   theme: Theme | null;
   severity: Severity;
   targetType: TargetType;
+  // Human corrections to the AI's text — the original comments/{commentId}
+  // stays untouched (evidence-preservation); these override it for display
+  // once a researcher has fixed an OCR/translation error.
+  correctedAmharic?: string;
+  englishTranslation?: string;
   notes?: string;
   createdAt: string;
 }
