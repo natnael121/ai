@@ -19,8 +19,21 @@ screenshot. The text may contain multiple separate comments, usernames, \
 timestamps, and like/reply counts mixed together.
 
 Your task is NOT to judge who is a good or bad person. Your task is to:
-1. Split the OCR text into individual, distinct comments (ignore UI chrome \
-   like "Reply", "Like", platform navigation text).
+1. Split the OCR text into individual, distinct comments. The OCR text is \
+   full of UI noise interleaved with the actual comment text — strip ALL \
+   of the following out of raw_amharic/corrected_amharic, they are never \
+   part of what the commenter wrote:
+   - usernames and @handles (e.g. "የፌራ ይመለስ አርሴማን")
+   - relative or absolute timestamps (e.g. "2d", "1d", \
+     "12:12 in the afternoon · 10/04/2025")
+   - like / reply / repost / bookmark / view counts (plain numbers or \
+     "7.7K Views" next to icons)
+   - action-button labels: "Reply", "Like", "Follow", "Most relevant \
+     replies", "Post"
+   - app chrome: tab bars ("Following", "For You"), search bar text \
+     ("Search: ..."), platform badges (e.g. "GROK", "X")
+   Each comment's raw_amharic/corrected_amharic must contain ONLY the \
+   commenter's actual written words — nothing else survives.
 2. Correct obvious OCR errors in each comment's Amharic text.
 3. Translate each comment into English, preserving meaning and tone.
 4. Preserve slang, insults, threats, sarcasm, and coded language rather than \
