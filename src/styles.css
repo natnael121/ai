@@ -17,7 +17,7 @@
   --sev-high: #c15a3a;
   --sev-critical: #8c1f1f;
 
-  /* theme palette (8 codes) */
+  /* theme palette (7 themes + --t-none for "no theme assigned") */
   --t-victim-blaming: #c15a3a;
   --t-normalization: #8c1f1f;
   --t-survivor-support: #2e8b74;

@@ -13,7 +13,7 @@ import {
   Pie,
   Legend,
 } from "recharts";
-import { loadDataset, ALL_THEMES, THEME_LABELS, type DatasetRow } from "../lib/dataset";
+import { loadDataset, ALL_THEMES, THEME_LABELS, NO_THEME_LABEL, type DatasetRow } from "../lib/dataset";
 import { exportToExcel, exportToCsv, exportToJson } from "../lib/exportDataset";
 import type { Severity, Theme } from "../types/research";
 
@@ -33,8 +33,8 @@ const THEME_COLOR: Record<Theme, string> = {
   online_harassment_abuse: "var(--t-harassment)",
   feminist_resistance: "var(--t-feminist-resistance)",
   silence_self_censorship: "var(--t-silence)",
-  no_apparent_violence: "var(--t-none)",
 };
+const NO_THEME_COLOR = "var(--t-none)";
 
 function resolveColor(cssVar: string): string {
   if (typeof window === "undefined") return "#999";
@@ -50,6 +50,7 @@ export default function DashboardPage() {
   const [severityFilter, setSeverityFilter] = useState<string>("all");
   const [themeFilter, setThemeFilter] = useState<string>("all");
   const [reviewFilter, setReviewFilter] = useState<string>("all");
+  const [showRawTable, setShowRawTable] = useState(false);
 
   useEffect(() => {
     loadDataset()
@@ -62,7 +63,8 @@ export default function DashboardPage() {
     return rows.filter((r) => {
       if (platformFilter !== "all" && r.platform !== platformFilter) return false;
       if (severityFilter !== "all" && r.severity !== severityFilter) return false;
-      if (themeFilter !== "all" && !r.themes.includes(themeFilter as Theme)) return false;
+      if (themeFilter === "__none__" && r.theme !== null) return false;
+      if (themeFilter !== "all" && themeFilter !== "__none__" && r.theme !== themeFilter) return false;
       if (reviewFilter !== "all" && r.humanReviewStatus !== reviewFilter) return false;
       return true;
     });
@@ -75,16 +77,14 @@ export default function DashboardPage() {
 
   const screenshotCount = useMemo(() => new Set(filtered.map((r) => r.imageId)).size, [filtered]);
   const violentCount = filtered.filter((r) => r.violencePresent).length;
-  const nonViolentCount = filtered.filter(
-    (r) => !r.violencePresent && r.themes.length > 0 && !r.themes.includes("no_apparent_violence")
-  ).length;
+  const nonViolentCount = filtered.filter((r) => !r.violencePresent && r.theme !== null).length;
   const uncertainCount = filtered.length - violentCount - nonViolentCount;
 
   const themeFrequency = useMemo(() => {
     const counts = new Map<Theme, number>();
     for (const t of ALL_THEMES) counts.set(t, 0);
     for (const row of filtered) {
-      for (const t of row.themes) counts.set(t, (counts.get(t) ?? 0) + 1);
+      if (row.theme) counts.set(row.theme, (counts.get(row.theme) ?? 0) + 1);
     }
     return ALL_THEMES.map((t) => ({
       theme: t,
@@ -106,12 +106,13 @@ export default function DashboardPage() {
     return platforms.map((platform) => {
       const row: Record<string, string | number> = { platform };
       for (const t of ALL_THEMES) {
-        row[t] = filtered.filter((r) => r.platform === platform && r.themes.includes(t)).length;
+        row[t] = filtered.filter((r) => r.platform === platform && r.theme === t).length;
       }
       return row;
     });
   }, [filtered, platforms]);
 
+  const noThemeCount = filtered.filter((r) => r.theme === null).length;
   const totalCoded = filtered.length || 1;
 
   if (error) {
@@ -156,8 +157,8 @@ export default function DashboardPage() {
           label="Theme"
           value={themeFilter}
           onChange={setThemeFilter}
-          options={["all", ...ALL_THEMES]}
-          labels={{ all: "All", ...THEME_LABELS }}
+          options={["all", "__none__", ...ALL_THEMES]}
+          labels={{ all: "All", __none__: NO_THEME_LABEL, ...THEME_LABELS }}
         />
         <FilterSelect
           label="Review status"
@@ -166,11 +167,16 @@ export default function DashboardPage() {
           options={["all", "pending", "accepted", "modified", "rejected"]}
         />
         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          <button className="btn btn-outline" onClick={() => setShowRawTable((v) => !v)}>
+            {showRawTable ? "Hide raw table" : "View raw table"}
+          </button>
           <button className="btn" onClick={() => exportToExcel(filtered)}>Export Excel</button>
           <button className="btn btn-outline" onClick={() => exportToCsv(filtered)}>CSV</button>
           <button className="btn btn-outline" onClick={() => exportToJson(filtered)}>JSON</button>
         </div>
       </div>
+
+      {showRawTable && <RawTable rows={filtered} />}
 
       {/* Signature: signal vs. silence composition bar */}
       <div className="card">
@@ -192,6 +198,12 @@ export default function DashboardPage() {
                 }}
               />
             ))}
+          {noThemeCount > 0 && (
+            <div
+              title={`${NO_THEME_LABEL}: ${noThemeCount} (${((noThemeCount / totalCoded) * 100).toFixed(1)}%)`}
+              style={{ width: `${(noThemeCount / totalCoded) * 100}%`, background: resolveColor(NO_THEME_COLOR) }}
+            />
+          )}
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 16px", marginTop: 12, fontSize: 12 }}>
           {themeFrequency.map((t) => (
@@ -208,6 +220,20 @@ export default function DashboardPage() {
               {t.label} <span className="mono">{t.count}</span>
             </span>
           ))}
+          {noThemeCount > 0 && (
+            <span style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--ink-muted)" }}>
+              <span
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: 2,
+                  background: resolveColor(NO_THEME_COLOR),
+                  display: "inline-block",
+                }}
+              />
+              {NO_THEME_LABEL} <span className="mono">{noThemeCount}</span>
+            </span>
+          )}
         </div>
       </div>
 
@@ -288,6 +314,70 @@ export default function DashboardPage() {
             </ResponsiveContainer>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function RawTable({ rows }: { rows: DatasetRow[] }) {
+  return (
+    <div className="card">
+      <div className="stat-label" style={{ marginBottom: 12 }}>
+        Raw data ({rows.length.toLocaleString()} row{rows.length === 1 ? "" : "s"})
+      </div>
+      <div style={{ overflow: "auto", maxHeight: 480 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, whiteSpace: "nowrap" }}>
+          <thead>
+            <tr style={{ textAlign: "left", borderBottom: "1px solid var(--line)" }}>
+              {[
+                "Image ID",
+                "Comment ID",
+                "Platform",
+                "Date",
+                "Raw Amharic",
+                "Corrected Amharic",
+                "English Translation",
+                "Violence",
+                "Theme",
+                "Severity",
+                "Target",
+                "AI Confidence",
+                "Human Review",
+                "Human Theme",
+                "Notes",
+                "Likes",
+                "Replies",
+              ].map((h) => (
+                <th key={h} style={{ padding: "6px 10px", position: "sticky", top: 0, background: "var(--surface)" }}>
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.commentId} style={{ borderBottom: "1px solid var(--line)" }}>
+                <td className="mono" style={{ padding: "6px 10px" }}>{r.imageId}</td>
+                <td className="mono" style={{ padding: "6px 10px" }}>{r.commentId}</td>
+                <td style={{ padding: "6px 10px" }}>{r.platform}</td>
+                <td style={{ padding: "6px 10px" }}>{r.date}</td>
+                <td style={{ padding: "6px 10px", whiteSpace: "normal", maxWidth: 220 }}>{r.rawAmharic}</td>
+                <td style={{ padding: "6px 10px", whiteSpace: "normal", maxWidth: 220 }}>{r.correctedAmharic}</td>
+                <td style={{ padding: "6px 10px", whiteSpace: "normal", maxWidth: 260 }}>{r.englishTranslation}</td>
+                <td style={{ padding: "6px 10px" }}>{r.violencePresent ? "Yes" : "No"}</td>
+                <td style={{ padding: "6px 10px" }}>{r.theme ? THEME_LABELS[r.theme] : NO_THEME_LABEL}</td>
+                <td style={{ padding: "6px 10px" }}>{r.severity}</td>
+                <td style={{ padding: "6px 10px" }}>{r.targetType}</td>
+                <td className="mono" style={{ padding: "6px 10px" }}>{r.aiConfidence.toFixed(2)}</td>
+                <td style={{ padding: "6px 10px" }}>{r.humanReviewStatus}</td>
+                <td style={{ padding: "6px 10px" }}>{r.humanTheme ? THEME_LABELS[r.humanTheme] : NO_THEME_LABEL}</td>
+                <td style={{ padding: "6px 10px", whiteSpace: "normal", maxWidth: 200 }}>{r.researcherNotes}</td>
+                <td className="mono" style={{ padding: "6px 10px" }}>{r.likes ?? ""}</td>
+                <td className="mono" style={{ padding: "6px 10px" }}>{r.replies ?? ""}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

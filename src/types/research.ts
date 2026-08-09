@@ -9,8 +9,15 @@ export type ProcessingStatus =
   | "classified"
   | "failed";
 
-export type Platform = "facebook" | "tiktok" | "telegram" | "instagram" | "other";
+export type Platform =
+  | "facebook"
+  | "tiktok"
+  | "telegram"
+  | "instagram"
+  | "twitter"
+  | "other";
 
+/** Single-label: a comment gets exactly one of these, or null if none apply. */
 export type Theme =
   | "victim_blaming"
   | "normalization_of_gbv"
@@ -18,8 +25,7 @@ export type Theme =
   | "gender_stereotypes_misogyny"
   | "online_harassment_abuse"
   | "feminist_resistance"
-  | "silence_self_censorship"
-  | "no_apparent_violence";
+  | "silence_self_censorship";
 
 export type Severity = "none" | "low" | "moderate" | "high" | "critical";
 
@@ -71,7 +77,7 @@ export interface ClassificationDoc {
   commentId: string;
   imageId: string;
   violencePresent: boolean;
-  themes: Theme[]; // multi-label
+  theme: Theme | null; // single-label; null if none of the 7 apply
   severity: Severity;
   targetType: TargetType;
   targetExplicitlyIdentified: boolean;
@@ -95,7 +101,7 @@ export interface AnnotationDoc {
   imageId: string;
   researcherId: string;
   reviewStatus: ReviewStatus; // accept / modify / reject vs AI classification
-  themes: Theme[];
+  theme: Theme | null;
   severity: Severity;
   targetType: TargetType;
   notes?: string;

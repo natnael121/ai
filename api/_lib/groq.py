@@ -15,11 +15,19 @@ digital violence and gender-based violence (GBV) discourse in Amharic-language \
 social media content ("Mapping the Silence").
 
 You will receive OCR-extracted Amharic text from a single social-media \
-screenshot. The text may contain multiple separate comments, usernames, \
-timestamps, and like/reply counts mixed together.
+screenshot. The text may contain multiple separate comments AND replies to \
+those comments — treat each one (comment or reply) as its own separate \
+entry, usernames, timestamps, and like/reply counts mixed together.
 
 Your task is NOT to judge who is a good or bad person. Your task is to:
-1. Split the OCR text into individual, distinct comments. The OCR text is \
+0. Estimate which social media platform this single screenshot is from, \
+   based on textual/UI cues in the OCR text (tab labels like "For You" / \
+   "Following" → tiktok; "@handle" formats, a "GROK" badge, "Views" counts \
+   → twitter; etc). Choose exactly one of: facebook, tiktok, telegram, \
+   instagram, twitter, other. This is a single judgment for the whole \
+   screenshot, not per comment.
+1. Split the OCR text into individual, distinct comments (including any \
+   replies present — each is its own entry). The OCR text is \
    full of UI noise interleaved with the actual comment text — strip ALL \
    of the following out of raw_amharic/corrected_amharic, they are never \
    part of what the commenter wrote:
@@ -41,8 +49,8 @@ Your task is NOT to judge who is a good or bad person. Your task is to:
 5. Distinguish direct speech ("I will hurt you") from description \
    ("he threatened to hurt me"), condemnation, quotation, or discussion of \
    violence — these are not equivalent.
-6. Code each comment against ALL applicable themes (multi-label) from this \
-   fixed list:
+6. Assign each comment exactly ONE theme (single-label, not a list) from \
+   this fixed list of 7:
    - victim_blaming
    - normalization_of_gbv
    - survivor_support
@@ -50,7 +58,11 @@ Your task is NOT to judge who is a good or bad person. Your task is to:
    - online_harassment_abuse
    - feminist_resistance
    - silence_self_censorship
-   - no_apparent_violence  (use when nothing else applies)
+   If none of these 7 clearly applies, set theme to null — do not force a \
+   best-fit label. theme and violence_present are independent judgments: \
+   e.g. a comment can be theme=survivor_support with violence_present=true \
+   (describing violence while supporting the survivor), or theme=null with \
+   violence_present=false (no signal either way).
 7. Do not infer personal characteristics (ethnicity, religion, etc.) that \
    are not explicitly expressed in the text.
 8. Do not invent context that isn't in the text.
@@ -63,6 +75,7 @@ Return ONLY valid JSON (no markdown fences, no commentary) matching exactly \
 this shape:
 
 {
+  "platform": "other",
   "comments": [
     {
       "raw_amharic": "",
@@ -72,7 +85,7 @@ this shape:
       "likes": null,
       "replies": null,
       "violence_present": false,
-      "themes": [],
+      "theme": null,
       "severity": "none",
       "target_type": "unclear",
       "target_explicitly_identified": false,
@@ -90,8 +103,12 @@ this shape:
 }
 """
 
+KNOWN_PLATFORMS = {"facebook", "tiktok", "telegram", "instagram", "twitter", "other"}
 
-def classify_comments(raw_ocr_text: str) -> list[dict]:
+
+def classify_comments(raw_ocr_text: str) -> tuple[str, list[dict]]:
+    """Returns (platform, comments) — platform is a single estimate for the
+    whole screenshot; comments is the per-comment list."""
     api_key = os.environ["GROQ_API_KEY"]
     model = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
 
@@ -119,4 +136,7 @@ def classify_comments(raw_ocr_text: str) -> list[dict]:
     content = resp.json()["choices"][0]["message"]["content"]
 
     parsed = json.loads(content)
-    return parsed.get("comments", [])
+    platform = parsed.get("platform")
+    if platform not in KNOWN_PLATFORMS:
+        platform = "other"
+    return platform, parsed.get("comments", [])

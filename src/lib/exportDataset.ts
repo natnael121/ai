@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import type { DatasetRow } from "./dataset";
-import { THEME_LABELS } from "./dataset";
+import { NO_THEME_LABEL, THEME_LABELS } from "./dataset";
 
 function toExportRow(row: DatasetRow) {
   return {
@@ -12,7 +12,7 @@ function toExportRow(row: DatasetRow) {
     "Corrected Amharic": row.correctedAmharic,
     "English Translation": row.englishTranslation,
     "Violence Present": row.violencePresent ? "Yes" : "No",
-    Themes: row.themes.map((t) => THEME_LABELS[t]).join("; "),
+    Theme: row.theme ? THEME_LABELS[row.theme] : NO_THEME_LABEL,
     Severity: row.severity,
     "Target Type": row.targetType,
     Threat: row.threatPresent ? "Yes" : "No",
@@ -22,7 +22,7 @@ function toExportRow(row: DatasetRow) {
     "Privacy Abuse": row.privacyAbuse ? "Yes" : "No",
     "AI Confidence": row.aiConfidence,
     "Human Review Status": row.humanReviewStatus,
-    "Human Themes": row.humanThemes.map((t) => THEME_LABELS[t]).join("; "),
+    "Human Theme": row.humanTheme ? THEME_LABELS[row.humanTheme] : NO_THEME_LABEL,
     "Researcher Notes": row.researcherNotes,
     Likes: row.likes ?? "",
     Replies: row.replies ?? "",
@@ -32,9 +32,8 @@ function toExportRow(row: DatasetRow) {
 function summaryRows(rows: DatasetRow[]) {
   const counts = new Map<string, number>();
   for (const row of rows) {
-    for (const t of row.themes) {
-      counts.set(THEME_LABELS[t], (counts.get(THEME_LABELS[t]) ?? 0) + 1);
-    }
+    const label = row.theme ? THEME_LABELS[row.theme] : NO_THEME_LABEL;
+    counts.set(label, (counts.get(label) ?? 0) + 1);
   }
   const total = rows.length || 1;
   return Array.from(counts.entries())

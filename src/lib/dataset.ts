@@ -17,7 +17,7 @@ export interface DatasetRow {
   correctedAmharic: string;
   englishTranslation: string;
   violencePresent: boolean;
-  themes: Theme[];
+  theme: Theme | null;
   severity: string;
   targetType: string;
   threatPresent: boolean;
@@ -27,7 +27,7 @@ export interface DatasetRow {
   privacyAbuse: boolean;
   aiConfidence: number;
   humanReviewStatus: string; // "pending" | "accepted" | "modified" | "rejected"
-  humanThemes: Theme[];
+  humanTheme: Theme | null;
   researcherNotes: string;
   likes: number | null;
   replies: number | null;
@@ -41,8 +41,9 @@ export const THEME_LABELS: Record<Theme, string> = {
   online_harassment_abuse: "Online harassment & abuse",
   feminist_resistance: "Feminist resistance & advocacy",
   silence_self_censorship: "Silence & self-censorship",
-  no_apparent_violence: "No apparent violence",
 };
+
+export const NO_THEME_LABEL = "No theme";
 
 export const ALL_THEMES = Object.keys(THEME_LABELS) as Theme[];
 
@@ -97,7 +98,7 @@ export async function loadDataset(): Promise<DatasetRow[]> {
       correctedAmharic: comment.correctedAmharic,
       englishTranslation: comment.englishTranslation,
       violencePresent: classification?.violencePresent ?? false,
-      themes: classification?.themes ?? [],
+      theme: classification?.theme ?? null,
       severity: classification?.severity ?? "none",
       targetType: classification?.targetType ?? "unclear",
       threatPresent: classification?.threatPresent ?? false,
@@ -107,7 +108,7 @@ export async function loadDataset(): Promise<DatasetRow[]> {
       privacyAbuse: classification?.privacyAbuse ?? false,
       aiConfidence: classification?.confidence ?? 0,
       humanReviewStatus: annotation?.reviewStatus ?? "pending",
-      humanThemes: annotation?.themes ?? [],
+      humanTheme: annotation?.theme ?? null,
       researcherNotes: annotation?.notes ?? "",
       likes: comment.likes ?? null,
       replies: comment.replies ?? null,

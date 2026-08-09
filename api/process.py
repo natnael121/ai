@@ -63,7 +63,7 @@ def handle_process(image_id: str) -> dict:
 
     # --- Groq: split into comments, correct, translate, classify ---
     image_ref.update({"status": "grok_pending"})
-    comments = classify_comments(raw_text)
+    platform, comments = classify_comments(raw_text)
 
     batch = db.batch()
     for i, c in enumerate(comments, start=1):
@@ -91,7 +91,7 @@ def handle_process(image_id: str) -> dict:
                 "commentId": comment_id,
                 "imageId": image_id,
                 "violencePresent": c.get("violence_present", False),
-                "themes": c.get("themes", []),
+                "theme": c.get("theme"),
                 "severity": c.get("severity", "none"),
                 "targetType": c.get("target_type", "unclear"),
                 "targetExplicitlyIdentified": c.get("target_explicitly_identified", False),
@@ -110,7 +110,9 @@ def handle_process(image_id: str) -> dict:
         )
     batch.commit()
 
-    image_ref.update({"status": "classified", "visibleCommentCount": len(comments)})
+    image_ref.update(
+        {"status": "classified", "visibleCommentCount": len(comments), "platform": platform}
+    )
     return {"imageId": image_id, "commentCount": len(comments)}
 
 
