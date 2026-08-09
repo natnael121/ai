@@ -1,16 +1,16 @@
 # Mapping the Silence — Research Console (scaffold)
 
-Pipeline: **Screenshot → ImageBB → Firestore → OCR (Tesseract.js, in-browser) → Grok
+Pipeline: **Screenshot → ImageBB → Firestore → OCR (Tesseract.js, in-browser) → Groq
 (split/correct/translate/classify) → Firestore → Review UI → Dashboard/Export**
 
 ## Stack
 - **Frontend:** React + TypeScript + Vite, deployed on Vercel
 - **Auth/DB:** Firebase (Auth + Firestore, free tier)
 - **Image storage:** ImageBB (client uploads directly, bypassing the backend)
-- **Backend:** Vercel Python serverless functions (`/api`) — Grok stage only
+- **Backend:** Vercel Python serverless functions (`/api`) — Groq stage only
 - **OCR:** Tesseract.js, entirely client-side in the researcher's browser —
   free, no API key, no usage cap, no Google/Azure account required
-- **Classification:** Grok API, given OCR text only (not the image) to save cost
+- **Classification:** Groq API, given OCR text only (not the image) to save cost
 
 ## Why this shape
 - **ImageBB stays client-side.** Uploading straight from the browser to
@@ -23,7 +23,7 @@ Pipeline: **Screenshot → ImageBB → Firestore → OCR (Tesseract.js, in-brows
   it's slower per image than a hosted OCR API — and accuracy on messy
   screenshots is more variable than Google Vision's, so budget time for
   the human-review stage to catch OCR mistakes.
-- **`/api/process` only does the Grok stage,** one image at a time. Vercel
+- **`/api/process` only does the Groq stage,** one image at a time. Vercel
   functions have a hard execution time limit; processing 100 screenshots
   means calling this endpoint 100 times (the Upload page does this
   automatically, once per screenshot, right after that screenshot's OCR
@@ -33,7 +33,7 @@ Pipeline: **Screenshot → ImageBB → Firestore → OCR (Tesseract.js, in-brows
   If you change the theme taxonomy later, you re-run classification against
   the existing `comments` without re-running OCR.
 - **AI classification is not ground truth.** `classifications/{commentId}`
-  holds Grok's output; `annotations/{annotationId}` holds each researcher's
+  holds Groq's output; `annotations/{annotationId}` holds each researcher's
   independent accept/modify/reject review, keyed by `(commentId,
   researcherId)` so multiple researchers can code the same comment for
   inter-rater agreement (Cohen's/Fleiss' kappa) later.
@@ -44,10 +44,10 @@ Pipeline: **Screenshot → ImageBB → Firestore → OCR (Tesseract.js, in-brows
    (`firebase deploy --only firestore:rules`) → generate a service account
    key (Project Settings → Service Accounts → Generate new private key).
 2. **ImageBB:** get a free API key from https://api.imgbb.com/.
-3. **Grok (xAI):** get an API key from https://console.x.ai/.
+3. **Groq:** get an API key from https://console.groq.com/keys.
 4. Copy `.env.example` → `.env.local`, fill in the `VITE_*` values.
 5. In the Vercel project settings, set the server-side vars
-   (`FIREBASE_SERVICE_ACCOUNT_JSON`, `GROK_API_KEY`) — never put these in
+   (`FIREBASE_SERVICE_ACCOUNT_JSON`, `GROQ_API_KEY`) — never put these in
    a `VITE_*` var or they'd ship to the browser.
 
 No OCR account or key is needed — Tesseract.js downloads the Amharic
@@ -66,7 +66,7 @@ Python functions in `/api`).
 
 ## What's built vs. what's next
 Built: upload flow (multi-file → ImageBB → Firestore → triggers
-processing), the full OCR→Grok→Firestore pipeline for one image, the
+processing), the full OCR→Groq→Firestore pipeline for one image, the
 Firestore data model (`src/types/research.ts`), and security rules.
 
 Also built: the **Dashboard** (`src/pages/Dashboard.tsx`). It reads
@@ -105,15 +105,15 @@ Stubbed (route exists, logic doesn't yet):
 
 ## A note on Vercel function limits
 `maxDuration: 60` is set for `api/process.py` in `vercel.json`. It now only
-runs the Grok stage (OCR happens in the browser before this is called), so
+runs the Groq stage (OCR happens in the browser before this is called), so
 it has more margin than before — but confirm your current Vercel plan's
-actual ceiling if Grok responses are consistently slow for large screenshots.
+actual ceiling if Groq responses are consistently slow for large screenshots.
 
 ## A note on Tesseract.js accuracy
 Client-side OCR trades some accuracy for being free and keyless. For messy
 or low-resolution screenshots, expect more OCR errors than a hosted API
 like Google Vision would produce. Two things in this scaffold exist
-specifically to absorb that: Grok's system prompt (`api/_lib/grok.py`) is
+specifically to absorb that: Groq's system prompt (`api/_lib/groq.py`) is
 told to correct obvious OCR errors before translating, and the Review page
-(still to be built) is where a human researcher catches whatever Grok
+(still to be built) is where a human researcher catches whatever Groq
 couldn't fix.

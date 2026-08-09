@@ -1,6 +1,6 @@
 """
-Sends raw OCR text (never the raw image, to keep Grok usage/cost down)
-to Grok and gets back a structured list of individual comments, each
+Sends raw OCR text (never the raw image, to keep Groq usage/cost down)
+to Groq and gets back a structured list of individual comments, each
 corrected, translated, and coded against the research taxonomy.
 """
 
@@ -8,7 +8,7 @@ import json
 import os
 import requests
 
-GROK_ENDPOINT = "https://api.x.ai/v1/chat/completions"
+GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions"
 
 SYSTEM_PROMPT = """You are an AI research assistant supporting an academic study of \
 digital violence and gender-based violence (GBV) discourse in Amharic-language \
@@ -79,8 +79,8 @@ this shape:
 
 
 def classify_comments(raw_ocr_text: str) -> list[dict]:
-    api_key = os.environ["GROK_API_KEY"]
-    model = os.environ.get("GROK_MODEL", "grok-4")
+    api_key = os.environ["GROQ_API_KEY"]
+    model = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
 
     body = {
         "model": model,
@@ -93,7 +93,7 @@ def classify_comments(raw_ocr_text: str) -> list[dict]:
     }
 
     resp = requests.post(
-        GROK_ENDPOINT,
+        GROQ_ENDPOINT,
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -101,7 +101,8 @@ def classify_comments(raw_ocr_text: str) -> list[dict]:
         json=body,
         timeout=45,
     )
-    resp.raise_for_status()
+    if not resp.ok:
+        raise RuntimeError(f"Groq API error {resp.status_code}: {resp.text}")
     content = resp.json()["choices"][0]["message"]["content"]
 
     parsed = json.loads(content)

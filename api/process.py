@@ -1,11 +1,11 @@
 """
 POST /api/process   body: {"imageId": "..."}
 
-Processes ONE screenshot's Grok stage:
+Processes ONE screenshot's Groq stage:
   Firestore ocr_results/{imageId}   (written client-side by Tesseract.js,
                                       see src/lib/ocr.ts — this endpoint
                                       does NOT run OCR itself)
-      -> Grok: split + correct +      -> comments/{commentId}
+      -> Groq: split + correct +      -> comments/{commentId}
          translate + classify         -> classifications/{commentId}
       -> images/{imageId}.status = "classified"
 
@@ -17,7 +17,7 @@ in one request.
 
 Every stage is written to its own collection and never overwritten,
 per the evidence-preservation requirement: raw OCR stays raw even if
-Grok is re-run later with an updated taxonomy.
+Groq is re-run later with an updated taxonomy.
 """
 
 import os
@@ -34,7 +34,7 @@ import json as jsonlib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from _lib.firebase_admin_client import get_db
-from _lib.grok import classify_comments
+from _lib.groq import classify_comments
 
 
 def handle_process(image_id: str) -> dict:
@@ -61,7 +61,7 @@ def handle_process(image_id: str) -> dict:
         image_ref.update({"status": "classified", "errorMessage": "OCR returned no text"})
         return {"imageId": image_id, "commentCount": 0}
 
-    # --- Grok: split into comments, correct, translate, classify ---
+    # --- Groq: split into comments, correct, translate, classify ---
     image_ref.update({"status": "grok_pending"})
     comments = classify_comments(raw_text)
 
@@ -104,7 +104,7 @@ def handle_process(image_id: str) -> dict:
                 "rationale": c.get("rationale", ""),
                 "confidence": c.get("confidence", 0.0),
                 "uncertainties": c.get("uncertainties", []),
-                "model": "grok",
+                "model": "groq",
                 "createdAt": time.time(),
             },
         )
