@@ -20,10 +20,18 @@ per the evidence-preservation requirement: raw OCR stays raw even if
 Grok is re-run later with an updated taxonomy.
 """
 
+import os
+import sys
 import time
 import traceback
 from http.server import BaseHTTPRequestHandler
 import json as jsonlib
+
+# Vercel's Python runtime loads this file via importlib.util, which does
+# not add the file's own directory to sys.path the way a normal `python
+# script.py` invocation would — so the sibling import below needs help
+# finding `_lib` (api/_lib/).
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from _lib.firebase_admin_client import get_db
 from _lib.grok import classify_comments
