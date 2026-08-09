@@ -1,0 +1,45 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Screenshots and their derived data: readable/writable by any
+    // signed-in researcher for now. Tighten to a per-project allowlist
+    // (e.g. a `research_projects/{projectId}.members` array) before
+    // adding external collaborators.
+    match /images/{imageId} {
+      allow read, create: if isSignedIn();
+      // Clients advance status through the OCR stage themselves
+      // (uploaded -> ocr_pending -> ocr_done); the backend (Admin SDK,
+      // which bypasses these rules) takes it from grok_pending onward.
+      allow update: if isSignedIn() && request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['platform', 'errorMessage', 'status', 'updatedAt']);
+    }
+
+    match /ocr_results/{imageId} {
+      allow read: if isSignedIn();
+      // Written once, client-side, right after Tesseract.js finishes
+      // (src/lib/ocr.ts). No update/delete — raw OCR is never overwritten.
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+
+    match /comments/{commentId} {
+      allow read: if isSignedIn();
+      allow write: if false; // backend (Admin SDK) only
+    }
+
+    match /classifications/{commentId} {
+      allow read: if isSignedIn();
+      allow write: if false; // backend (Admin SDK) only
+    }
+
+    match /annotations/{annotationId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && request.resource.data.researcherId == request.auth.uid;
+    }
+  }
+}

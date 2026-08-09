@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/firebase.ts","./src/main.tsx","./src/lib/api.ts","./src/lib/auth.ts","./src/lib/dataset.ts","./src/lib/exportdataset.ts","./src/lib/firestore.ts","./src/lib/imagebb.ts","./src/lib/ocr.ts","./src/pages/dashboard.tsx","./src/pages/review.tsx","./src/pages/upload.tsx","./src/types/research.ts"],"version":"5.9.3"}
