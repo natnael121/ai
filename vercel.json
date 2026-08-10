@@ -4,6 +4,9 @@
   "functions": {
     "api/process.py": {
       "maxDuration": 60
+    },
+    "api/reset.py": {
+      "maxDuration": 60
     }
   }
 }

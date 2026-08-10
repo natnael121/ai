@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { uploadToImageBb } from "../lib/imagebb";
 import { createScreenshotDoc, createOcrResultDoc, updateScreenshotStatus } from "../lib/firestore";
 import { runOcr, terminateOcrWorker } from "../lib/ocr";
-import { processImage } from "../lib/api";
+import { processImage, resetAllData } from "../lib/api";
 import { auth } from "../firebase";
 
 type RowStatus =
@@ -26,9 +26,13 @@ interface Row {
 // src/lib/auth.ts). TODO: swap for a real research project selector.
 const RESEARCH_PROJECT_ID = "project_default";
 
+const DELETE_CONFIRMATION_PHRASE = "DELETE";
+
 export default function UploadPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [running, setRunning] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
 
   // Free the Tesseract.js worker's memory when the researcher navigates away.
   useEffect(() => () => void terminateOcrWorker(), []);
@@ -82,14 +86,43 @@ export default function UploadPage() {
     setRunning(false);
   }
 
+  // DESTRUCTIVE, no undo: wipes every researcher's images/comments/
+  // classifications/annotations and best-effort deletes the underlying
+  // ImageBB files. Gated behind a typed confirmation since a single
+  // misclick here would erase the whole shared research dataset.
+  async function handleDeleteAllData() {
+    const typed = window.prompt(
+      `This permanently deletes ALL screenshots, comments, classifications, and reviews ` +
+        `for EVERY researcher — not just yours — and attempts to delete the image files too. ` +
+        `This cannot be undone.\n\nType ${DELETE_CONFIRMATION_PHRASE} to confirm:`
+    );
+    if (typed !== DELETE_CONFIRMATION_PHRASE) return;
+
+    setResetting(true);
+    setResetMessage(null);
+    try {
+      const result = await resetAllData();
+      const counts = Object.entries(result.deletedCounts)
+        .map(([name, count]) => `${name}: ${count}`)
+        .join(", ");
+      setResetMessage(
+        `Deleted — ${counts}. ImageBB: ${result.imagebb.ok}/${result.imagebb.attempted} files removed.`
+      );
+      setRows([]);
+    } catch (err) {
+      setResetMessage(`Failed: ${(err as Error).message}`);
+    } finally {
+      setResetting(false);
+    }
+  }
+
   return (
     <div style={{ display: "grid", gap: 20 }}>
       <div className="card">
         <p style={{ marginTop: 0 }}>
           Upload screenshots of social-media posts and comments for analysis. Each
-          screenshot is uploaded to ImageBB, processed with Amharic optical character
-          recognition (Tesseract.js, running locally in your browser at no cost), and
-          then classified using Groq.
+          screenshot is uploaded , processed with Amharic optical character
+          recognition.
         </p>
         <input
           type="file"
@@ -110,6 +143,28 @@ export default function UploadPage() {
             Reset
           </button>
         </div>
+      </div>
+
+      <div className="card">
+        <div className="stat-label" style={{ marginBottom: 8 }}>Danger zone</div>
+        <p style={{ marginTop: 0, fontSize: 13, color: "var(--ink-muted)" }}>
+          Permanently delete every screenshot, comment, classification, and researcher
+          review across the whole dataset — not just what's shown above. Requires typed
+          confirmation and cannot be undone.
+        </p>
+        <button
+          className="btn"
+          style={{ background: "var(--sev-critical)", borderColor: "var(--sev-critical)" }}
+          onClick={handleDeleteAllData}
+          disabled={resetting}
+        >
+          {resetting ? "Deleting…" : "Delete ALL data"}
+        </button>
+        {resetMessage && (
+          <p className="mono" style={{ fontSize: 12, marginTop: 10, color: "var(--ink-muted)" }}>
+            {resetMessage}
+          </p>
+        )}
       </div>
 
       {rows.length > 0 && (

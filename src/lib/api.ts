@@ -47,3 +47,23 @@ export async function processBatch(
 
   await Promise.all(Array.from({ length: concurrency }, worker));
 }
+
+export interface ResetResult {
+  deletedCounts: Record<string, number>;
+  imagebb: { attempted: number; ok: number };
+}
+
+/**
+ * DESTRUCTIVE, no undo: wipes every images/ocr_results/comments/
+ * classifications/annotations doc for every researcher, and best-effort
+ * deletes each screenshot's file from ImageBB. See api/reset.py.
+ * Callers must confirm with the user before calling this.
+ */
+export async function resetAllData(): Promise<ResetResult> {
+  const res = await fetch("/api/reset", { method: "POST" });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`resetAllData() failed: ${text}`);
+  }
+  return res.json();
+}
